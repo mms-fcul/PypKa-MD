@@ -1,0 +1,114 @@
+; pypka-MD template .MDP
+
+define              =
+integrator          =  md
+tinit               =  0.0
+dt                  =  0.002    ; ps !
+nsteps              =  1000    ; define here the cphmd tau_prot (20ps)
+;; RelaxSteps = 100             ; tau_relax is 100 by default and defined in configs.py
+nstcomm             =  1
+nstcalcenergy       =  1
+nstxout-compressed  =  1000
+nstxout             =  0
+nstvout             =  0
+nstfout             =  0
+nstlog              =  0
+nstenergy           =  1000
+
+ns_type             =  grid
+cutoff-scheme       =  group ; Verlet for gmx>4.6
+                             ; group for gmx<5.1.5
+vdwtype             =  cut-off
+
+;PME
+;nstlist             =  20   ; until 40 for gpu
+;rlist               = 1.4   ; 1.0 for membranes
+;coulombtype         = PME
+;rcoulomb            = 1.4   ; 1.0 for membranes
+;fourierspacing      = 0.16
+;pme_order           = 4
+;rvdw                = 1.4   ; 1.0 for membranes
+
+;GRF (with external ionic strength - modified code)
+coulombtype         = Generalized-Reaction-Field
+nstlist             = 5
+rlist               = 1.4    ; twin-range (0.8) generates instabilities (see Silva2018)
+rcoulomb            = 1.4
+epsilon_rf          = 61.0   ; (see CYS) old value = 54.0 (see Smith94)
+rvdw                = 1.4
+ionicstrength       = 0.06022   ; can only be used with GRF and gromacs-?.?.?_pH_I
+                                ; (molecule / nm**3) multiply Molar units by 0.6022
+
+; Energy monitoring
+energygrps          =  Protein SOL ; with Verlet use one energy group "System"
+
+; v-rescaletemperature coupling is on available groups
+; This thermostat is similar to Berendsen coupling, but the stochastic
+; term ensures that a proper canonical ensemble is generated.
+Tcoupl              =  v-rescale
+nsttcouple          =  -1
+tc-grps             =  Protein  SOL       ; with Verlet use one energy group "System"
+tau_t               =  0.10     0.10
+ref_t               =  310.0    310.0
+
+; Isotropic pressure coupling is now on
+Pcoupl              =  Parrinello-Rahman
+Pcoupltype          =  isotropic         ; for membranes semiisotropic
+nstpcouple          =  -1
+tau_p               =  1.0               ; for membranes use 2.0-5.0
+compressibility     =  4.5e-5
+ref_p               =  1.0
+
+; lincs_order value of 8 works better than 4
+constraint_algorithm=  lincs
+lincs_order         =  8
+constraints         =  all-bonds
+lincs-warnangle     =  90
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; CpHMD Parameters ;;
+;;;;;;;;;;;;;;;;;;;;;;
+; these settings are ignored by gromacs and used by CpHMD
+; GROin = MYLYSO_000.gro
+; TOPin = MYLYSO_000.top
+; DATin = lyso_fixgro.dat
+;; NDXin = lyso.ndx ; optional
+
+; sysname = MYLYSO_001
+
+; sites = 1N 1 35 48 52 129C
+; titrating_group = Protein
+
+; nCycles = 2   ; 50 * tau_prot (20ps) = 1ns
+; nCPUs = 4
+
+; pH = 7.0
+; ionicstr = 0.1  ; this value is used in PB
+
+; GroDIR="/gromacs/gromacs-5.1.5_pH_I/bin/"
+; rcon=0
+
+;; Custom Charges, Radii and sts
+;; pypka_ffs_dir = "/home/user/dir"
+;; pypka_ffID = "G54A7"  ; /home/user/dir/G54A7/Database.{crg,siz} /home/user/dir/G54A7/sts
+
+;;;;;;;;;;;;;;;;;;;;
+;; SLURM SETTINGS ;;
+;;;;;;;;;;;;;;;;;;;;
+;; these settings are ignored by gromacs and used by SLURM
+;; Number of Segments (usually in nanoseconds):
+;SLURM segments = 50
+
+;; Choose the list of machines (partition)
+;; More than one partition can be supplied, separated by commas and without spaces
+;; GPU:   All machines with GPU
+;; (this will be chosen if GROMACS with GPU is selected)
+;; MD:    All machines available for MD without GPU
+;; MD32:  List of machines with 32 cores/threads
+;; MD24:  List of older machines with 24 cores/threads
+;; LOW:   List of older machines with low resources (suitable for small/short systems/simulations)
+;SLURM partition = MD32f, MD24, MD16, LOW
+
+;; Requeue: the job is restarted in another node in case the assigned one reboots
+;; Options are 1 or 0
+;SLURM requeue = 1 ; optional as 1 is default

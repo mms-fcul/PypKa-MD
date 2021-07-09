@@ -1,0 +1,93 @@
+[ None ]
+
+[ COO- ]
+[ replace ]
+C	C	C	12.011	0.27
+O	O1	OM	15.9994	-0.635
+OXT	O2	OM	15.9994	-0.635
+[ add ]
+2	8	O	C	CA	N
+	OM	15.9994	-0.635
+[ bonds ]
+C	O1	gb_6
+C	O2	gb_6
+[ angles ]
+O1	C	O2	ga_38
+CA	C	O1	ga_22
+CA	C	O2	ga_22
+[ dihedrals ]
+N	CA	C	O2	gd_45
+N       CA      C       O2      gd_42
+[ impropers ]
+C	CA	O2	O1	gi_1
+
+[ COOH ]
+[ replace ]
+C	C	C	12.011	0.33
+O	O	OA	15.9994	-0.288
+OXT	OT	O	15.9994	-0.45
+[ add ]
+1	2	OT	C	CA	N
+	O	15.9994	-0.45
+1	2	HO	O	C	CA
+	H	1.008	0.408
+[ bonds ]
+C	O	gb_13
+C	OT	gb_5
+O	HO	gb_1
+[ angles ]
+O	C	OT	ga_33
+C	O	HO	ga_12
+CA	C	O	ga_19
+CA	C	OT	ga_30
+[ dihedrals ]
+N	CA	C	O	gd_45
+N	CA	C	O	gd_42
+CA	C	O	HO	gd_12
+[ impropers ]
+C	CA	OT	O	gi_1
+
+;Charged carboxyl with 4 hydrogen "empty" atoms
+[ CTX ]
+[ replace ]
+C	C	C	12.011	 0.27
+O	O2	OM	15.9994	-0.635
+OXT	O1	OM	15.9994	-0.635
+[ add ]
+1	2	O1	C	CA	N
+	OM	15.9994	-0.635
+1	2	HO11	O1	C	CA
+	H	1.008	0.000
+1	2	HO21	O2	C	CA
+	H	1.008	0.000
+1	2	HO12	O1	CA	C
+	H	1.008	0.000
+1	2	HO22	O2	CA	C
+	H	1.008	0.000
+[ bonds ]
+C	O1	gb_6
+C	O2 	gb_6
+O2 	HO21	gb_1
+O2 	HO22	gb_1
+O1	HO11	gb_1
+O1	HO12	gb_1
+[ angles ]
+O1 	C	O2	ga_38
+C	O2 	HO21	ga_12
+C	O2 	HO22	ga_12
+C	O1	HO11	ga_12
+C	O1      HO12	ga_12
+CA	C	O1	ga_22
+CA	C	O2 	ga_22
+HO21	O2 	HO22	ga_CtrHH
+HO11	O1	HO12	ga_CtrHH
+[ dihedrals ]
+N	CA	C	O1	gd_45
+N	CA	C	O1	gd_42
+CA	C	O2 	HO21	gd_CtrCCOH
+CA	C	O1	HO11	gd_CtrCCOH
+[ impropers ]
+C	CA	O2 	O1	gi_1
+O2 	C	HO21	HO22	gi_1
+O1	C	HO11	HO12	gi_1
+
