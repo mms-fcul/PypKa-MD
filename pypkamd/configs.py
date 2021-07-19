@@ -5,7 +5,7 @@ from builtins import bool
 import pypka._version as pypka_version
 from pypka.config import ParametersDict as ParametersDictPypKa
 
-from misc import remove_comments
+from pypkamd.misc import remove_comments
 
 
 def get_username():
@@ -92,18 +92,6 @@ class MDConfig(ParametersDict):
         self.reduced_titration = True
         self.rt_cycles = 10
         self.rt_limit = 0.001
-
-        # DEFAULT NAMES FOR OUTPUT .TOP FILE
-        self.titrable_aas = {
-            "AS": "ASP",
-            "CT": "CT",
-            "CY": "CYS",
-            "GL": "GLU",
-            "HI": "HIS",
-            "LY": "LYS",
-            "NT": "NT",
-            "TY": "TYR",
-        }
 
         self.titrating_group = None
 

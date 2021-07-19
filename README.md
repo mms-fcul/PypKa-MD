@@ -9,7 +9,7 @@ Implementation of the stochastic titration method <sup>1</sup>
 ## Installation
 
 ```
-git clone https://github.com/mms-fcul/cphmd.git .
+python3 -m pip install pypkamd
 ```
 
 ## Dependencies
@@ -21,10 +21,16 @@ Both PypKa and GROMACS are required to be installed in the system.
 
 ## Usage
 
-PypKa-MD can be used by executing the pypkamd folder with a python3, giving as an argument a modified GROMACS .mdp input file to include Constant-pH specific variables.
+Upon installation a PypKa-MD executable should have been added to your bin. You may call it directly giving as an argument a modified GROMACS .mdp input file to include Constant-pH specific variables.
 
 ```
-python3 pypkamd System.mdp
+pypkamd System.mdp
+```
+
+In case the executable as not been added to your bin, you may use:
+
+```
+python3 -m pypkamd System.mdp
 ```
 
 You may find an example .mdp file in /utils/cphmd.mdp. 

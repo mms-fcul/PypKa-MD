@@ -174,9 +174,6 @@ copy_files = """
 # Copy important files for local directory; first gro is called
 mkdir -p /tmp/{user}_CpHMD$$
 
-# line needed to mount /programs using autofs
-ls /programs/CpH-MD/CpH-MD_v2.04/scripts/ >/dev/null 2>&1; sleep 5
-
 cp {rundir}/{sysname}_${{j}}.mdp /tmp/{user}_CpHMD$$
 cp {rundir}/{sysname}_${{l}}.{{top,gro}} /tmp/{user}_CpHMD$$
 cp {rundir}/{dat} /tmp/{user}_CpHMD$$

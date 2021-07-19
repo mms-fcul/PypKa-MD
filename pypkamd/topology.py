@@ -1,6 +1,7 @@
 import logging
 
-from misc import check_convert_termini, get_titrable_sites, remove_comments
+from pypkamd.misc import check_convert_termini, get_titrable_sites, remove_comments
+from pypkamd.constants import TITRABLE_AAS
 
 
 class Topology:
@@ -55,7 +56,7 @@ class Topology:
         self.fixed_sites = {}
 
         self.read_input_top(configs.TOPin, configs.sites, configs.ffID)
-        self.read_ff_dict(configs.ff_dict, configs.titrable_aas)
+        self.read_ff_dict(configs.ff_dict)
 
         self.index_atoms = {configs.titrating_group: []}
 
@@ -165,7 +166,7 @@ class Topology:
             else:
                 tit_resnumbs.append(i)
 
-        cph_ready_resnames = {i: ii for i, ii in self.config_vars.titrable_aas.items()}
+        cph_ready_resnames = {i: ii for i, ii in TITRABLE_AAS.items()}
 
         last_section = None
         section = "begin"
@@ -282,14 +283,9 @@ class Topology:
         # pprint(self.ters)
         # exit()
 
-    def read_ff_dict(self, ff_dict, titrable_aas):
+    def read_ff_dict(self, ff_dict):
 
         tit_res_cph = self.get_titrable_resnames()
-
-        # tit_res = []
-        # for resname, cphname in titrable_aas.items():
-        #    if cphname in tit_res_cph:
-        #        tit_res.append(cphname)
 
         with open(ff_dict) as f_dict:
             for line in f_dict:
@@ -308,7 +304,6 @@ class Topology:
 
                 properties = cols[-n_tauts:]
                 prop_obj = self.prop_types[line_type][1]
-                # resname = titrable_aas[resname]
 
                 if line_type in ("t", "q"):
                     aname = cols[2]
@@ -318,12 +313,6 @@ class Topology:
                 elif line_type in ("b", "a", "d", "i"):
                     anames = cols[2 : 2 + natoms]
                     search_in = self.prop_types[line_type][2]
-
-                    # if line_type == "a":
-                    #    print("#############################")
-                    #    print(line)
-                    #    print(resname)
-                    #    print(anames)
 
                     for i, item in self.search_by_anames(search_in, resname, anames):
                         resnumb = self.get_resnumb_from_anumb(item[0])
@@ -441,24 +430,59 @@ class Topology:
 
                 # print(resnumb, anumbs, new_prop)
 
-        self.write_prot_file(self.occ, self.f_occ)
-        self.write_prot_file(self.mocc, self.f_mocc)
+        self.write_prot_file(self.occ, self.f_occ, "occ")
+        self.write_prot_file(self.mocc, self.f_mocc, "mocc")
 
-        # TODO write .charges
-        # TODO write .occ + .mocc together
+    def get_ordered_sites(self):
+        sorted_sites = []
+        termini = []
+        for res in self.all_sites:
+            if isinstance(res, str):
+                termini.append(res)
+            else:
+                sorted_sites.append(res)
+        sorted_sites.sort()
 
-    def write_prot_file(self, prot_obj, fprot_name):
+        for res in termini:
+            res_numb = int(res[:-1])
+            i = 0
+            sorted_res = sorted_sites[i]
+            if isinstance(sorted_res, str):
+                sorted_res = int(sorted_res[:-1])
+
+            while sorted_res < res_numb and i + 2 <= len(sorted_sites):
+                i += 1
+                sorted_res = sorted_sites[i]
+                if isinstance(sorted_res, str):
+                    sorted_res = int(sorted_res[:-1])
+                print(sorted_res, res_numb, i, len(sorted_sites))
+
+            if res[-1] == "C" and (
+                sorted_res <= res_numb or i + 1 == len(sorted_sites)
+            ):
+                i += 1
+            sorted_sites.insert(i, res)
+        return sorted_sites
+
+    def write_prot_file(self, prot_obj, fprot_name, mode):
         content = "# "
         nframes = len(list(prot_obj.values())[0])
-        for site in self.all_sites:
-            content += "{} ".format(site)
-        content += "\n"
+
+        for site in self.get_ordered_sites():
+            if mode == "mocc":
+                content += "{:>8} ".format(site)
+            elif mode == "occ":
+                content += "{:>4} ".format(site)
+        content += "\n  "
         for i in range(nframes):
-            for site in self.all_sites:
+            for site in self.get_ordered_sites():
                 site = check_convert_termini(site, self.offset)
                 site_occ = prot_obj[site][i]
-                content += "{} ".format(site_occ)
-            content += "\n"
+                if mode == "mocc":
+                    content += "{:8.6f} ".format(site_occ)
+                elif mode == "occ":
+                    content += "{:4} ".format(site_occ)
+            content += "\n  "
         with open(fprot_name, "w") as f_new:
             f_new.write(content)
 

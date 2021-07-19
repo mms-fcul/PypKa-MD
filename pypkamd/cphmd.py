@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 from pypka import Titration
 from pypka.clean.formats import read_gro_line
 
-from configs import Config
-from misc import create_link, get_curtime, remove_comments
+from pypkamd.configs import Config
+from pypkamd.misc import create_link, get_curtime, remove_comments
 
 
 def create_cphdm_directory():
