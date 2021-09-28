@@ -88,6 +88,8 @@ class MDConfig(ParametersDict):
 
         self.pH = None
         self.ionicstr = None
+        self.nlit = 100
+        self.nonit = 5
 
         self.reduced_titration = True
         self.rt_cycles = 10
@@ -101,6 +103,8 @@ class MDConfig(ParametersDict):
 
         self.pypka_ffs_dir = "default"
         self.pypka_ffID = "default"
+        self.pypka_nlit = "default"
+        self.pypka_nonit = "default"
 
         self.input_type = {
             "TimeStep": float,
@@ -125,6 +129,10 @@ class MDConfig(ParametersDict):
             "rt_cycles": int,
             "rt_limit": float,
             "reduced_titration": bool,
+            "pypka_ffs_dir": str,
+            "pypka_ffID": str,
+            "pypka_nlit": int,
+            "pypka_nonit": int,
         }
 
         # TODO implement '>=0' condition
@@ -164,10 +172,17 @@ class MDConfig(ParametersDict):
             "clean_pdb": False,
             "CpHMD_mode": True,
             "sts": "sts_cphmd",
+            "nlit": self.nlit,
+            "nonit": self.nonit,
         }
-        if self.pypka_ffs_dir != "default" and self.pypka_ffID != "default":
+        if self.pypka_ffs_dir != "default":
             self.pypka_params["ffs_dir"] = self.pypka_ffs_dir
+        if self.pypka_ffID != "default":
             self.pypka_params["ffID"] = self.pypka_ffID
+        if self.pypka_nlit != "default":
+            self.pypka_params["nlit"] = self.pypka_nlit
+        if self.pypka_nonit != "default":
+            self.pypka_params["nonit"] = self.pypka_nonit
 
     def read_input_mdp(self):
         def add_sites(mdp_sites):

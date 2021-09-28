@@ -319,7 +319,6 @@ class Topology:
                         prop_obj[i] = (resnumb, item[:natoms], properties)
 
         # from pprint import pprint
-
         # pprint(self.tit_angles)
         # pprint(self.prop_types["a"])
         # pprint(self.tit_charges)
@@ -434,6 +433,11 @@ class Topology:
         self.write_prot_file(self.mocc, self.f_mocc, "mocc")
 
     def get_ordered_sites(self):
+        def get_resnumber(res):
+            if isinstance(res, str):
+                res = int(res[:-1])
+            return res
+
         sorted_sites = []
         termini = []
         for res in self.all_sites:
@@ -442,25 +446,25 @@ class Topology:
             else:
                 sorted_sites.append(res)
         sorted_sites.sort()
-
         for res in termini:
             res_numb = int(res[:-1])
-            i = 0
-            sorted_res = sorted_sites[i]
-            if isinstance(sorted_res, str):
-                sorted_res = int(sorted_res[:-1])
+            if not sorted_sites:
+                sorted_sites.append(res)
+                continue
+            sorted_res = get_resnumber(sorted_sites[0])
 
+            i = 0
             while sorted_res < res_numb and i + 2 <= len(sorted_sites):
                 i += 1
-                sorted_res = sorted_sites[i]
-                if isinstance(sorted_res, str):
-                    sorted_res = int(sorted_res[:-1])
-                print(sorted_res, res_numb, i, len(sorted_sites))
+                sorted_res = get_resnumber(sorted_sites[i])
+                # print(sorted_res, res_numb, i, len(sorted_sites))
 
-            if res[-1] == "C" and (
-                sorted_res <= res_numb or i + 1 == len(sorted_sites)
-            ):
+            if res_numb > sorted_res:
                 i += 1
+
+            if res[-1] == "C" and sorted_res <= res_numb:
+                i += 1
+
             sorted_sites.insert(i, res)
         return sorted_sites
 

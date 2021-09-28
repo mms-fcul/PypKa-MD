@@ -363,8 +363,6 @@ def run_cphmd(top):
         top.update(pb_prot_states, pb_prot_avgs, pb_taut_probs)
         top.write_top_file()
 
-        # exit()
-
         ### MD ###
         info = "{} | MD    - solvent relaxation for {} steps".format(
             get_curtime(), Config.md_configs.RelaxSteps

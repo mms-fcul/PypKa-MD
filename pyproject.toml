@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pypkamd"
-version = "0.0.1"
+version = "0.1.0"
 description = "PypKa + GROMACS = an awesome Constant-pH Molecular Dynamics implementation"
 authors = ["Pedro Reis <pdreis@fc.ul.pt>"]
 license = "LGPLv3"
@@ -15,7 +15,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.6"
-pypka = ">=2.3.0"
+pypka = ">=2.4.0"
 
 [tool.poetry.dev-dependencies]
 recommonmark = "*"

@@ -6,12 +6,16 @@ from pypkamd.configs import Config
 from pypkamd.cphmd import create_cphdm_directory, final_cleanup, run_cphmd
 from pypkamd.misc import get_curtime
 from pypkamd.topology import Topology
+from pypkamd import __version__
 
 
 def CLI():
     init_time = time.time()
     parser = argparse.ArgumentParser(description="PypKa-MD")
-    parser.add_argument("mdp", type=str, help="MDP file")
+    parser.add_argument(
+        "mdp", type=str, help="MDP file", action="store", default="system.mdp"
+    )
+    parser.add_argument("-v", "--version", action="version", version=__version__)
 
     args = parser.parse_args()
 

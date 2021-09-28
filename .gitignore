@@ -1,6 +1,8 @@
 old_cph_versions/
 play/
 vals/
+debug
+tests/*out
 .vscode/
 .mypy_cache/
 
