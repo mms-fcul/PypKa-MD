@@ -1,4 +1,5 @@
 import logging
+import random
 
 from pypkamd.misc import check_convert_termini, get_titrable_sites, remove_comments
 from pypkamd.constants import TITRABLE_AAS
@@ -345,15 +346,33 @@ class Topology:
                         )
                         raise IOError(msg)
 
+    def sample_fixed(self, prob_states):
+        for site, (prob, cur_state, taut_probs) in self.fixed_sites.items():
+            tauts = list(range(len(taut_probs)))
+            new_state = random.choices(tauts, taut_probs)[0]
+
+            if isinstance(site, str) and site[-1] in "NC":
+                s = int(site[:-1]) + self.offset
+            else:
+                s = site
+
+            prob_states[s] = new_state
+            self.fixed_sites[site] = (prob, new_state, taut_probs)
+
+        return prob_states
+
     def update(self, new_states, new_protavg, new_tautprobs):
         if self.config_vars["reduced_titration"]:
             self.rt_cur_cycle += 1
 
-            for site, state in self.fixed_sites.items():
-                if isinstance(site, str) and site[-1] in "NC":
-                    site = int(site[:-1]) + self.offset
-                self.mocc[site].append(state[0])
-                self.occ[site].append(state[1])
+            if self.fixed_sites:
+                new_states = self.sample_fixed(new_states)
+
+            # for site, state in self.fixed_sites.items():
+            #    if isinstance(site, str) and site[-1] in "NC":
+            #        site = int(site[:-1]) + self.offset
+            #    self.mocc[site].append(state[0])
+            #    self.occ[site].append(state[1])
 
             if self.config_vars["rt_cycles"] == self.rt_cur_cycle:
                 self.rt_cur_cycle = 0
@@ -386,7 +405,7 @@ class Topology:
                     fixed_state = (avg, new_states[site], new_tautprobs[site])
                     self.fixed_sites[s] = fixed_state
 
-            # print(self.titres_states[site])
+        # print(self.titres_states[site])
         # print("rt cycle:", self.rt_cur_cycle)
         # print("fixed:", self.fixed_sites)
         # print("titrating next:", self.titrating_sites)
@@ -469,6 +488,11 @@ class Topology:
         return sorted_sites
 
     def write_prot_file(self, prot_obj, fprot_name, mode):
+        if fprot_name == self.f_occ:
+            from pprint import pprint
+
+            pprint(prot_obj)
+
         content = "# "
         nframes = len(list(prot_obj.values())[0])
 
@@ -477,6 +501,7 @@ class Topology:
                 content += "{:>8} ".format(site)
             elif mode == "occ":
                 content += "{:>4} ".format(site)
+
         content += "\n  "
         for i in range(nframes):
             for site in self.get_ordered_sites():

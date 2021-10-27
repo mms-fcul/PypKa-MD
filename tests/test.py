@@ -79,11 +79,11 @@ class TestPypKa(object):
                     mocc_prot = mocc[mocc_line][resi]
                     diff = prot_avgs[res] - mocc_prot
                     diffs.append(str(diff))
-                    assert diff < 0.06, (
+                    assert abs(diff) < 0.02, (
                         f"Difference is not small enough for residue {res}: {round(diff, 3)}"
                         f"; Expected: {mocc_prot}; Obtained: {prot_avgs[res]}"
                     )
-                    if diff > 0.03:
+                    if diff > 0.02:
                         with open("worst_AHHA.out", "a") as f:
                             f.write(
                                 f"AHHA {rep}_protein_{i:0>3}.gro {mocc_prot} {prot_avgs[res]} {round(diff, 3)} \n"

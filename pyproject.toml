@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pypkamd"
-version = "0.1.0"
+version = "0.1.1"
 description = "PypKa + GROMACS = an awesome Constant-pH Molecular Dynamics implementation"
 authors = ["Pedro Reis <pdreis@fc.ul.pt>"]
 license = "LGPLv3"

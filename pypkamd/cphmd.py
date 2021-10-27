@@ -1,14 +1,13 @@
 import io
 import logging
 import os
-import random
 import subprocess as sb
 import time
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
 
 from pypka import Titration
-from pypka.clean.formats import read_gro_line
+from pdbmender.formats import read_gro_line
 
 from pypkamd.configs import Config
 from pypkamd.misc import create_link, get_curtime, remove_comments
@@ -262,26 +261,6 @@ def final_cleanup(sysname, tmpDIR, effective_name):
     os.system("rm -r {}".format(tmpDIR))
 
 
-def sample_fixed(fixed_sites, offset, prob_states):
-    new_site_states = {}
-    for site, (prob, state, taut_probs) in fixed_sites.items():
-        tauts = list(range(len(taut_probs)))
-        new_state = random.choices(tauts, taut_probs)[0]
-
-        if new_state != state:
-            if isinstance(site, str) and site[-1] in "NC":
-                s = int(site[:-1]) + offset
-            else:
-                s = site
-
-            new_site_states[s] = new_state
-            fixed_sites[site] = (prob, new_state, taut_probs)
-
-    for site in new_site_states.keys():
-        prob_states[site] = new_site_states[site]
-    return fixed_sites, prob_states
-
-
 def run_pbmc(params, sites, pH, offset, fixed_sites):
     # print(sites, fixed_sites)
     prot_states = {}
@@ -354,11 +333,6 @@ def run_cphmd(top):
             )
         print("\r" + " " * 90, end="\r")
         Config.md_configs.LOG.write(f.getvalue())
-
-        if top.fixed_sites:
-            top.fixed_sites, pb_prot_states = sample_fixed(
-                top.fixed_sites, top.offset, pb_prot_states
-            )
 
         top.update(pb_prot_states, pb_prot_avgs, pb_taut_probs)
         top.write_top_file()

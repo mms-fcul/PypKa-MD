@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 from pypka import getTitrableSites
-from pypka.clean.formats import gro2pdb, read_pdb_line
+from pdbmender.formats import gro2pdb, read_pdb_line
 
 
 def get_curtime():
