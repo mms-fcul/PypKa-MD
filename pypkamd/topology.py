@@ -1,26 +1,20 @@
 import logging
 import random
+from typing import Optional, List, Tuple, Dict
 
 from pypkamd.misc import check_convert_termini, get_titrable_sites, remove_comments
 from pypkamd.constants import TITRABLE_AAS
+from pypkamd.configs import Config
 
 
 class Topology:
-    def __init__(self, configs):
+    def __init__(self, configs: Config):
 
-        # 0      1      2        3        4      5           6       7
-        # [anumb, atype, resnumb, resname, aname, chargenumb, charge, mass]
-        self.atoms = []
-        self.bonds = []
-        self.pairs = []
-        self.angles = []
-        self.dihedrals = []
-        self.impropers = []
-
-        self.others = {}
+        self.sections = ["atoms", "bonds", "pairs", "angles", "dihedrals", "impropers"]
+        self.section = {section: [] for section in self.sections}
+        self.section["others"] = {}
 
         self.tit_atoms = {}
-
         self.tit_atypes = {}
         self.tit_charges = {}
         self.tit_bonds = {}
@@ -31,13 +25,11 @@ class Topology:
         self.prop_types = {
             "t": (1, self.tit_atypes),
             "q": (1, self.tit_charges),
-            "b": (2, self.tit_bonds, self.bonds),
-            "a": (3, self.tit_angles, self.angles),
-            "d": (4, self.tit_dihedrals, self.dihedrals),
-            "i": (4, self.tit_impropers, self.impropers),
+            "b": (2, self.tit_bonds, self.section["bonds"]),
+            "a": (3, self.tit_angles, self.section["angles"]),
+            "d": (4, self.tit_dihedrals, self.section["dihedrals"]),
+            "i": (4, self.tit_impropers, self.section["impropers"]),
         }
-
-        self.sections = ["atoms", "bonds", "pairs", "angles", "dihedrals", "impropers"]
 
         self.offset = None
         self.ters = {}
@@ -76,24 +68,21 @@ class Topology:
         self.f_occ = configs.sysname + ".occ"
         self.f_mocc = configs.sysname + ".mocc"
 
-    def __getitem__(self, name):
-        return self.__dict__[name]
+    def get_nres(self) -> int:
+        return int(self.section["atoms"][-1][2])
 
-    def get_nres(self):
-        return int(self.atoms[-1][2])
-
-    def get_atom(self, anumb):
-        for atom in self.atoms:
+    def get_atom(self, anumb: str) -> Optional[int]:
+        for atom in self.section["atoms"]:
             if atom[0] == anumb:
                 return atom
         return None
 
-    def get_titrable_resnames(self):
+    def get_titrable_resnames(self) -> List[str]:
         resnames = []
         for resnumb, atom_i_list in self.tit_atoms.items():
             if resnumb < self.offset:
                 atom_i = atom_i_list[0]
-                atom = self.atoms[atom_i]
+                atom = self.section["atoms"][atom_i]
                 resname = atom[3]
                 resnames.append(resname)
             else:
@@ -103,16 +92,16 @@ class Topology:
 
         return list(set(resnames))
 
-    def atom_is_titrable(self, anumb):
+    def atom_is_titrable(self, anumb: int) -> Optional[int]:
         anumb = int(anumb) - 1
         for residue, atoms in self.tit_atoms.items():
             if anumb in atoms:
                 return residue
         return False
 
-    def get_atoms(self, resname, aname):
+    def get_atoms(self, resname: str, aname: str) -> Tuple[int, str, str]:
         # print("###################################", resname, aname)
-        for atom in self.atoms:
+        for atom in self.section["atoms"]:
             anumb, resnumb, resname_, aname_ = atom[0], int(atom[2]), atom[3], atom[4]
             tit_residue = self.atom_is_titrable(anumb)
             if (
@@ -121,9 +110,11 @@ class Topology:
             ):
                 resname_ = self.ters[resnumb]
             if aname == aname_ and tit_residue and resname == resname_:
-                yield anumb, resname, aname
+                yield (anumb, resname, aname)
 
-    def search_by_anames(self, search_item, resname, anames):
+    def search_by_anames(
+        self, search_item: str, resname: str, anames: str
+    ) -> Tuple[int, list]:
         anumbs = []
         for aname in anames:
             for i in self.get_atoms(resname, aname):
@@ -139,23 +130,23 @@ class Topology:
                     item_anames.append(aname_)
 
             if item_anames == anames:
-                yield i, item
+                yield (i, item)
 
-    def get_resnumb_from_anumb(self, anumb):
-        for atom in self.atoms:
+    def get_resnumb_from_anumb(self, anumb: str) -> int:
+        for atom in self.section["atoms"]:
             anumb_ = atom[0]
             if anumb_ == anumb:
                 return atom[2]
 
-    def read_input_top(self, f_top, titrating_resnumbs, ffID):
-        def save_other_lines(last_section, line):
+    def read_input_top(self, f_top: str, titrating_resnumbs: List[int], ffID: str):
+        def save_other_lines(last_section: str, line: str):
             if last_section == None:
                 last_section = "begin"
             elif last_section == False:
                 last_section = "end"
-            if last_section not in self.others:
-                self.others[last_section] = []
-            self.others[last_section].append(line)
+            if last_section not in self.section["others"]:
+                self.section["others"][last_section] = []
+            self.section["others"][last_section].append(line)
 
         ter_resnumbs = {}
         tit_resnumbs = []
@@ -190,7 +181,7 @@ class Topology:
 
                 if clean_line.startswith("[ "):
                     tmp_section = clean_line.strip("[] \n")
-                    if self.dihedrals and "dihedrals" == tmp_section:
+                    if self.section["dihedrals"] and "dihedrals" == tmp_section:
                         tmp_section = "impropers"
 
                     if tmp_section in self.sections:
@@ -201,18 +192,20 @@ class Topology:
 
                 elif section in self.sections:
                     cols = clean_line.split()
-                    self[section].append(cols)
+                    self.section[section].append(cols)
 
                     resnumb = int(cols[2])
                     if section == "atoms":
                         resname = cols[3]
                         atype = cols[4]
-                        atom_i = len(self.atoms) - 1
+                        atom_i = len(self.section["atoms"]) - 1
                         add_ter_atom = False
 
                         if resnumb in tit_resnumbs:
                             if resname[:2] in cph_ready_resnames.keys():
-                                self.atoms[-1][3] = cph_ready_resnames[resname[:2]]
+                                self.section["atoms"][-1][3] = cph_ready_resnames[
+                                    resname[:2]
+                                ]
 
                         if resnumb in ter_resnumbs:
                             ter_type = ter_resnumbs[resnumb]
@@ -226,7 +219,7 @@ class Topology:
                                 ):
                                     self.ters[resnumb] = "NT"
                                     add_ter_atom = True
-                                    # self.atoms[-1][3] = "NT"
+                                    # self.section["atoms"][-1][3] = "NT"
 
                                 elif resname in ("GLY", "PRO") and atype in (
                                     "N",
@@ -251,7 +244,7 @@ class Topology:
                                 ):  # TODO: read from dictionary.dic
                                     self.ters[resnumb] = "CT"
                                     add_ter_atom = True
-                                    # self.atoms[-1][3] = "CT"
+                                    # self.section["atoms"][-1][3] = "CT"
 
                             if add_ter_atom:
                                 if resnumb not in tmp_ter_atoms:
@@ -280,11 +273,11 @@ class Topology:
 
         # pprint(self.tit_atoms)
         # pprint(self.tit_angles)
-        # pprint(self.atoms)
+        # pprint(self.section["atoms"])
         # pprint(self.ters)
         # exit()
 
-    def read_ff_dict(self, ff_dict):
+    def read_ff_dict(self, ff_dict: dict) -> None:
 
         tit_res_cph = self.get_titrable_resnames()
 
@@ -325,7 +318,7 @@ class Topology:
         # pprint(self.tit_charges)
         # exit()
 
-    def read_index(self, ndx):
+    def read_index(self, ndx: str) -> None:
         index_groups = self.index_atoms.keys()
         with open(ndx) as f:
             save_group = False
@@ -346,10 +339,10 @@ class Topology:
                         )
                         raise IOError(msg)
 
-    def sample_fixed(self, prob_states):
-        for site, (prob, cur_state, taut_probs) in self.fixed_sites.items():
-            tauts = list(range(len(taut_probs)))
-            new_state = random.choices(tauts, taut_probs)[0]
+    def sample_fixed(self, prob_states: Dict[int, int]) -> Dict[int, int]:
+        for site, fixed_details in self.fixed_sites.items():
+            tauts = list(range(len(fixed_details["taut_probs"])))
+            new_state = random.choices(tauts, fixed_details["taut_probs"])[0]
 
             if isinstance(site, str) and site[-1] in "NC":
                 s = int(site[:-1]) + self.offset
@@ -357,7 +350,8 @@ class Topology:
                 s = site
 
             prob_states[s] = new_state
-            self.fixed_sites[site] = (prob, new_state, taut_probs)
+            self.fixed_sites[site]["state"] = new_state
+            self.mocc[s].append(fixed_details["prob"])
 
         return prob_states
 
@@ -367,12 +361,6 @@ class Topology:
 
             if self.fixed_sites:
                 new_states = self.sample_fixed(new_states)
-
-            # for site, state in self.fixed_sites.items():
-            #    if isinstance(site, str) and site[-1] in "NC":
-            #        site = int(site[:-1]) + self.offset
-            #    self.mocc[site].append(state[0])
-            #    self.occ[site].append(state[1])
 
             if self.config_vars["rt_cycles"] == self.rt_cur_cycle:
                 self.rt_cur_cycle = 0
@@ -402,32 +390,31 @@ class Topology:
                     site_i = self.titrating_sites.index(s)
                     del self.titrating_sites[site_i]
 
-                    fixed_state = (avg, new_states[site], new_tautprobs[site])
-                    self.fixed_sites[s] = fixed_state
+                    self.fixed_sites[s] = {
+                        "prob": avg,
+                        "state": new_states[site],
+                        "taut_probs": new_tautprobs[site],
+                    }
 
         # print(self.titres_states[site])
         # print("rt cycle:", self.rt_cur_cycle)
         # print("fixed:", self.fixed_sites)
         # print("titrating next:", self.titrating_sites)
 
-        # Deal with the actual new protonation states
+        # Deal with the new protonation states
         for site, state in new_states.items():
             self.titres_states[site] = state
             self.occ[site].append(state)
 
-            # print(site, state)
             for atom_id in self.tit_atoms[site]:
-                atom = self.atoms[atom_id]
+                atom = self.section["atoms"][atom_id]
                 anumb = atom[0]
-
-                # print(atom, anumb)
 
                 if anumb in self.tit_atypes:
                     atom[1] = self.tit_atypes[anumb][state]
-                    # print(atom, anumb, "atype", self.tit_atypes[anumb][state])
+
                 if anumb in self.tit_charges:
                     atom[6] = self.tit_charges[anumb][state]
-                    # print(atom, anumb, "charge", self.tit_charges[anumb][state])
 
         for prop_code, prop_objs in self.prop_types.items():
             if prop_code in ("q", "t"):
@@ -445,8 +432,6 @@ class Topology:
                 new_prop = item[2][new_state]
 
                 top_list[index][-1] = new_prop
-
-                # print(resnumb, anumbs, new_prop)
 
         self.write_prot_file(self.occ, self.f_occ, "occ")
         self.write_prot_file(self.mocc, self.f_mocc, "mocc")
@@ -488,11 +473,6 @@ class Topology:
         return sorted_sites
 
     def write_prot_file(self, prot_obj, fprot_name, mode):
-        if fprot_name == self.f_occ:
-            from pprint import pprint
-
-            pprint(prot_obj)
-
         content = "# "
         nframes = len(list(prot_obj.values())[0])
 
@@ -518,7 +498,7 @@ class Topology:
     def write_top_file(self):
         def seclist_to_str(seclist, extra_spaces=5):
             sec_str = ""
-            maxsize = len(self.atoms[-1][0]) + extra_spaces
+            maxsize = len(self.section["atoms"][-1][0]) + extra_spaces
             for line in seclist:
                 tmp_line = ""
                 for item in line[:-1]:
@@ -532,13 +512,13 @@ class Topology:
             return sec_str
 
         top_content = ""
-        if "begin" in self.others:
-            top_content += "\n".join(self.others["begin"]) + "\n"
+        if "begin" in self.section["others"]:
+            top_content += "\n".join(self.section["others"]["begin"]) + "\n"
 
         top_content += "[ atoms ]\n"
-        top_content += seclist_to_str(self.atoms, extra_spaces=8) + "\n"
+        top_content += seclist_to_str(self.section["atoms"], extra_spaces=8) + "\n"
 
-        # print(seclist_to_str(self.atoms, extra_spaces=8))
+        # print(seclist_to_str(self.section["atoms"], extra_spaces=8))
 
         for section in self.sections[1:]:
             section_name = section
@@ -546,12 +526,12 @@ class Topology:
                 section_name = "dihedrals"
 
             top_content += "[ {} ]\n".format(section_name)
-            top_content += seclist_to_str(self[section])
-            if section in self.others:
-                top_content += "\n".join(self.others[section]) + "\n"
+            top_content += seclist_to_str(self.section[section])
+            if section in self.section["others"]:
+                top_content += "\n".join(self.section["others"][section]) + "\n"
 
-        if "end" in self.others:
-            top_content += "\n".join(self.others["end"]) + "\n"
+        if "end" in self.section["others"]:
+            top_content += "\n".join(self.section["others"]["end"]) + "\n"
 
         final_content = ""
         for line in top_content.splitlines():

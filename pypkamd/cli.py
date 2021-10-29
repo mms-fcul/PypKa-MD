@@ -7,6 +7,7 @@ from pypkamd.cphmd import create_cphdm_directory, final_cleanup, run_cphmd
 from pypkamd.misc import get_curtime
 from pypkamd.topology import Topology
 from pypkamd import __version__
+from pypka import __version__ as pypka_version
 
 
 def CLI():
@@ -23,8 +24,10 @@ def CLI():
 
     Config.storeParams(args.mdp)
 
-    info = "Simulation run by {} @ {}\n" "Initial time: {}".format(
-        Config.md_configs.USER, Config.md_configs.HOST, get_curtime()
+    info = (
+        f"Simulation run by {Config.md_configs.USER} @ {Config.md_configs.HOST}\n"
+        f"PypKa-MD version: {__version__}\nPypKa version: {pypka_version}\n"
+        f"Initial time: {get_curtime()}"
     )
     logging.info(info)
 

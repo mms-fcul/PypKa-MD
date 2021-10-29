@@ -1,25 +1,26 @@
 import os
 from datetime import datetime
+from typing import List
 
 from pypka import getTitrableSites
 from pdbmender.formats import gro2pdb, read_pdb_line
 
 
-def get_curtime():
+def get_curtime() -> str:
     return datetime.today().strftime("%Y-%m-%d %H:%M")
 
 
-def remove_comments(line, comment_delimiter=";"):
+def remove_comments(line: str, comment_delimiter: str = ";") -> str:
     if len(comment_delimiter) == 1:
         return line.split(comment_delimiter)[0]
     return remove_comments(line.split(comment_delimiter[1:])[0])
 
 
-def create_link(path):
+def create_link(path: str) -> None:
     os.system("ln -s -f {} .".format(path))
 
 
-def get_titrable_sites(groname):
+def get_titrable_sites(groname: str) -> List[int]:
     gro2pdb(groname, "tmp.pdb", save_box=False)
     sites, _ = getTitrableSites("tmp.pdb", ser_thr_titration=False)
 
@@ -40,7 +41,7 @@ def get_titrable_sites(groname):
     return list(sites)
 
 
-def check_convert_termini(site, offset):
+def check_convert_termini(site: str, offset: int) -> int:
     if isinstance(site, str) and site[-1] in "NC":
         site = offset + int(site[:-1])
     return site

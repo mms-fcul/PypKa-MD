@@ -5,6 +5,7 @@ import subprocess as sb
 import time
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
+from typing import Dict, Tuple
 
 from pypka import Titration
 from pdbmender.formats import read_gro_line
@@ -13,7 +14,7 @@ from pypkamd.configs import Config
 from pypkamd.misc import create_link, get_curtime, remove_comments
 
 
-def create_cphdm_directory():
+def create_cphdm_directory() -> None:
     os.system("rm -rf {}".format(Config.md_configs.tmpDIR))
     os.system("mkdir -p {}".format(Config.md_configs.tmpDIR))
 
@@ -105,7 +106,9 @@ energygrp_excl = {1} {1}
     sb.run(new_tpr_cmd, shell=True, stdout=Config.md_configs.LOG, stderr=sb.STDOUT)
 
 
-def center_titrable_molecule(titrating_group, gro, ndx, outfile):
+def center_titrable_molecule(
+    titrating_group: str, gro: str, ndx: str, outfile: str
+) -> None:
     # Centering procedure
     # effective.gro -> fixgro_input.gro -> pypka_input.gro
 
@@ -133,7 +136,7 @@ def center_titrable_molecule(titrating_group, gro, ndx, outfile):
     sb.run(rm_cmd, shell=True)
 
 
-def run_dynamics(mdp, gro, top, ndx, sysname):
+def run_dynamics(mdp: str, gro: str, top: str, ndx: str, sysname: str) -> None:
     tpr_cmd = (
         "{0}/gmx grompp -f {1} -c {2} -p {3} -n {4} -o {5}.tpr -po {5}_out.mdp "
         "-maxwarn 1000 -quiet".format(
@@ -154,7 +157,7 @@ def run_dynamics(mdp, gro, top, ndx, sysname):
     sb.run(mdrun_cmd, shell=True, stdout=Config.md_configs.LOG, stderr=sb.STDOUT)
 
 
-def remove_freezed_velocities(top, relaxgro, effectivegro):
+def remove_freezed_velocities(top: str, relaxgro: str, effectivegro: str) -> None:
     freezed_atoms = top.index_atoms[Config.md_configs.titrating_group]
 
     final_gro = ""
@@ -190,7 +193,13 @@ def remove_freezed_velocities(top, relaxgro, effectivegro):
         f_new.write(final_gro)
 
 
-def concat_results(runname, cycle, effective_name, init_time, simtime_begin):
+def concat_results(
+    runname: str,
+    cycle: int,
+    effective_name: str,
+    init_time: float,
+    simtime_begin: float,
+) -> None:
     if cycle == 0:
         edr_in = "{}.edr".format(effective_name)
         edr_out = "{}.edr".format(runname)
@@ -243,7 +252,7 @@ def concat_results(runname, cycle, effective_name, init_time, simtime_begin):
     sb.run(save_logs_cmd, shell=True)
 
 
-def clean_dir(effective_name, relax_name, pypka_input):
+def clean_dir(effective_name: str, relax_name: str, pypka_input: str) -> None:
     clean_cmd = (
         "rm -f {0}.edr {0}.log {0}.xtc {0}.tpr {1}.edr"
         " {1}.gro {1}.log {1}.tpr {1}.xtc state.cpt"
@@ -254,15 +263,16 @@ def clean_dir(effective_name, relax_name, pypka_input):
     sb.run(clean_cmd, shell=True)
 
 
-def final_cleanup(sysname, tmpDIR, effective_name):
+def final_cleanup(sysname: str, tmpDIR: str, effective_name: str) -> None:
     os.system("cp {0}.gro ../{1}.gro".format(effective_name, sysname))
     os.system("cp {0}.edr {0}.log {0}.mocc {0}.occ {0}.xtc {0}.top ../".format(sysname))
     os.chdir("../")
     os.system("rm -r {}".format(tmpDIR))
 
 
-def run_pbmc(params, sites, pH, offset, fixed_sites):
-    # print(sites, fixed_sites)
+def run_pbmc(
+    params, sites, pH, offset, fixed_sites
+) -> Tuple[Dict[int, int], Dict[int, float], Dict[int, list]]:
     prot_states = {}
     prot_avgs = {}
     taut_probs = {}
@@ -279,14 +289,10 @@ def run_pbmc(params, sites, pH, offset, fixed_sites):
             prot_avgs[resnumb] = site.getTitrationCurve()[pH]
             taut_probs[resnumb] = site.getTautsProb(pH)
 
-            # print(site.final_states, site.states_prob)
-            # print(resname, resnumb, pb_prot_states[resnumb], pb_prot_avgs[resnumb])
-    # print(prot_avgs)
-
-    return prot_states, prot_avgs, taut_probs
+    return (prot_states, prot_avgs, taut_probs)
 
 
-def run_cphmd(top):
+def run_cphmd(top: str) -> None:
     cur_time, prev_time = None, None
     cycle_times = []
     for cycle in range(Config.md_configs.InitCycle, Config.md_configs.EndCycle):
@@ -329,7 +335,7 @@ def run_cphmd(top):
                 top.titrating_sites[:],
                 Config.md_configs.pH,
                 top.offset,
-                {k: v[1] for k, v in top.fixed_sites.items()},
+                {k: v["state"] for k, v in top.fixed_sites.items()},
             )
         print("\r" + " " * 90, end="\r")
         Config.md_configs.LOG.write(f.getvalue())

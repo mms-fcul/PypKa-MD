@@ -14,7 +14,7 @@ def get_username():
 
 class Config:
     @classmethod
-    def storeParams(cls, mdp):
+    def storeParams(cls, mdp: str):
         if pypka_version.__version__ < "2.3.0":
             raise Exception(
                 "Please update your PypKa installation. \nCurrent version: {}\nRequired version: >= 2.3.0".format(
@@ -35,7 +35,7 @@ class ParametersDict(ParametersDictPypKa):
 
 
 class MDConfig(ParametersDict):
-    def __init__(self, fmdp):
+    def __init__(self, fmdp: str):
 
         self.TimeStep = None
         self.InitTime = None
@@ -145,7 +145,7 @@ class MDConfig(ParametersDict):
         #    'EffectiveSteps': '>=0'
         # }
 
-    def get_simtime(self, cycle):
+    def get_simtime(self, cycle: int):
         simtime_begin = self.InitTime + self.EffectiveTime * cycle
         simtime_end = simtime_begin + self.EffectiveTime
         return simtime_begin, simtime_end
