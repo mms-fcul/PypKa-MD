@@ -46,11 +46,13 @@ def create_cphdm_directory() -> None:
         "freezegrps",
         "freezedim",
     ]
+
     with open(Config.md_configs.MDPin) as f, open(
         Config.md_configs.MDP, "w"
     ) as fmdp_new, open(Config.md_configs.MDP_relax, "w") as frelax_new:
         new_mdp_content = ""
         relax_mdp_content = ""
+        cutoff_scheme = ""
         for line in f:
             cleaned_line = remove_comments(line)
             parts = cleaned_line.split("=")
@@ -58,7 +60,14 @@ def create_cphdm_directory() -> None:
                 param = parts[0].strip()
                 if param not in relax_mdp_new_params:
                     relax_mdp_content += line
+                if param == "cutoff-scheme":
+                    cutoff_scheme = parts[1].split(";")[0].strip().lower()
+
             new_mdp_content += line
+
+        preffix_energygrp_excl = ""
+        if cutoff_scheme == "verlet":
+            preffix_energygrp_excl = ";"
 
         relax_mdp_content += """
 ;Solvent relaxation parameters
@@ -69,9 +78,11 @@ Pcoupl = No
 ;energygrps = {1}
 freezegrps = {1}
 freezedim = Y Y Y
-energygrp_excl = {1} {1}
+{2}energygrp_excl = {1} {1}
         """.format(
-            Config.md_configs.RelaxSteps, Config.md_configs.titrating_group
+            Config.md_configs.RelaxSteps,
+            Config.md_configs.titrating_group,
+            preffix_energygrp_excl,
         )
 
         fmdp_new.write(new_mdp_content)
