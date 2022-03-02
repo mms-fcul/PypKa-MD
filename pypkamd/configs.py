@@ -1,10 +1,9 @@
 import os
 import pwd
 from builtins import bool
-
-import pypka._version as pypka_version
+import logging
+from pypka import __version__ as pypka_version
 from pypka.config import ParametersDict as ParametersDictPypKa
-
 from pypkamd.misc import remove_comments
 
 
@@ -15,10 +14,10 @@ def get_username():
 class Config:
     @classmethod
     def storeParams(cls, mdp: str):
-        if pypka_version.__version__ < "2.3.0":
+        if pypka_version < "2.3.0":
             raise Exception(
                 "Please update your PypKa installation. \nCurrent version: {}\nRequired version: >= 2.3.0".format(
-                    pypka_version.__version__
+                    pypka_version
                 )
             )
 
@@ -95,6 +94,8 @@ class MDConfig(ParametersDict):
         self.rt_cycles = 10
         self.rt_limit = 0.001
 
+        self.pkai = False
+
         self.titrating_group = None
 
         self.pypka_input = "pypka_input.gro"
@@ -129,6 +130,7 @@ class MDConfig(ParametersDict):
             "rt_cycles": int,
             "rt_limit": float,
             "reduced_titration": bool,
+            "pkai": bool,
             "pypka_ffs_dir": str,
             "pypka_ffID": str,
             "pypka_nlit": int,
@@ -184,6 +186,10 @@ class MDConfig(ParametersDict):
         if self.pypka_nonit != "default":
             self.pypka_params["nonit"] = self.pypka_nonit
 
+        if self.pkai and self.reduced_titration:
+            self.reduced_titration = False
+            logging.warn("Reduced titration has been turned off")
+
     def read_input_mdp(self):
         def add_sites(mdp_sites):
             sites = []
@@ -225,6 +231,7 @@ class MDConfig(ParametersDict):
 
                     self[param] = param_value
 
+        self.check_mandatory_files()
         self.setFileNames()
         self.EndCycle = self.calcEndCyle()
         self.EffectiveTime = self.calcEffectiveTime()
@@ -233,3 +240,10 @@ class MDConfig(ParametersDict):
         for i in self.__dict__:
             if self[i] == None:
                 raise IOError("{} has not been defined.".format(i))
+
+    def check_mandatory_files(self):
+        for f in self.GROin, self.TOPin, self.DATin:
+            if not os.path.isfile(f):
+                raise IOError("Missing input file {}".format(f))
+        if self.NDXin:
+            os.path.isfile(self.NDXin)

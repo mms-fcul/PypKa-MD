@@ -16,8 +16,22 @@ python3 -m pip install pypkamd
 
 Both PypKa and GROMACS are required to be installed in the system.
 
-- PypKa >= 2.3.0
+- PypKa >= 2.7.1
 - GROMACS >=5.1.5
+
+When running in pKAI-MD mode there are extra dependencies:
+
+- pege >= 1.1.1
+- torch_geometric >= 2.0.0
+
+Please refer to the installation guide of [torch geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) to install the proper version in accordance to your CUDA and OS.
+
+```
+python3 -m pip install pege
+# EXAMPLE FOR CUDA10.2
+# python3 -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.10.0+cu102.html
+```
+
 
 ## Usage
 

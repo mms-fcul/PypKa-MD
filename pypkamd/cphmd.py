@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Tuple
 
 from pypka import Titration
+
 from pdbmender.formats import read_gro_line
 
 from pypkamd.configs import Config
@@ -277,8 +278,10 @@ def run_pbmc(
     prot_avgs = {}
     taut_probs = {}
     if len(sites) > 0:
-
-        tit = Titration(params, sites={"A": sites}, fixed_sites={"A": fixed_sites})
+        with redirect_stdout(io.StringIO()) as f:
+            tit = Titration(params, sites={"A": sites}, fixed_sites={"A": fixed_sites})
+        Config.md_configs.LOG.write(f.getvalue())
+        print("\r" + " " * 90, end="\r")
 
         for site in tit:
             resnumb = site.getResNumber()
@@ -292,6 +295,34 @@ def run_pbmc(
     return (prot_states, prot_avgs, taut_probs)
 
 
+def run_pkai(
+    fname, sites, pH, offset
+) -> Tuple[Dict[int, int], Dict[int, float], Dict[int, list]]:
+    try:
+        Pege
+    except NameError:
+        from pege import Pege
+
+    prot_states = {}
+    prot_avgs = {}
+    taut_probs = {}
+
+    protein = Pege(fname, save_final_pdb=False, fix_pdb=False)
+
+    for site in sites:
+        resnumb = site
+        if isinstance(resnumb, str):
+            resnumb = int(site[:-1]) + offset
+
+        (
+            prot_states[resnumb],
+            prot_avgs[resnumb],
+            taut_probs[resnumb],
+        ) = protein.get_residue_taut_probs("A", site, pH)
+
+    return (prot_states, prot_avgs, taut_probs)
+
+
 def run_cphmd(top: str) -> None:
     cur_time, prev_time = None, None
     cycle_times = []
@@ -300,7 +331,7 @@ def run_cphmd(top: str) -> None:
 
         simtime_begin, simtime_end = Config.md_configs.get_simtime(cycle)
 
-        info = "\n{} | Starting CpHMD Cycle #{}".format(get_curtime(), cycle)
+        info = "{} | Starting CpHMD Cycle #{}".format(get_curtime(), cycle)
         logging.info(info)
 
         if prev_time:
@@ -329,7 +360,7 @@ def run_cphmd(top: str) -> None:
             Config.md_configs.pypka_input,
         )
 
-        with redirect_stdout(io.StringIO()) as f:
+        if not Config.md_configs.pkai:
             pb_prot_states, pb_prot_avgs, pb_taut_probs = run_pbmc(
                 Config.md_configs.pypka_params,
                 top.titrating_sites[:],
@@ -337,8 +368,13 @@ def run_cphmd(top: str) -> None:
                 top.offset,
                 {k: v["state"] for k, v in top.fixed_sites.items()},
             )
-        print("\r" + " " * 90, end="\r")
-        Config.md_configs.LOG.write(f.getvalue())
+        else:
+            pb_prot_states, pb_prot_avgs, pb_taut_probs = run_pkai(
+                Config.md_configs.pypka_input,
+                top.titrating_sites[:],
+                Config.md_configs.pH,
+                top.offset,
+            )
 
         top.update(pb_prot_states, pb_prot_avgs, pb_taut_probs)
         top.write_top_file()

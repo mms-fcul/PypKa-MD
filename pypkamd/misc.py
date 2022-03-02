@@ -21,7 +21,7 @@ def create_link(path: str) -> None:
 
 
 def get_titrable_sites(groname: str) -> List[int]:
-    gro2pdb(groname, "tmp.pdb", save_box=False)
+    gro2pdb(groname, "tmp.pdb")
     sites, _ = getTitrableSites("tmp.pdb", ser_thr_titration=False)
 
     potential = []

@@ -8,6 +8,7 @@ from pypkamd.misc import get_curtime
 from pypkamd.topology import Topology
 from pypkamd import __version__
 from pypka import __version__ as pypka_version
+from pdbmender import __version__ as pdbmender_version
 
 
 def CLI():
@@ -24,9 +25,15 @@ def CLI():
 
     Config.storeParams(args.mdp)
 
+    if Config.md_configs.pkai:
+        from pege import __version__ as pege_version
+
+        pege_info = f"PEGE version: {pege_version}\n"
+
     info = (
         f"Simulation run by {Config.md_configs.USER} @ {Config.md_configs.HOST}\n"
         f"PypKa-MD version: {__version__}\nPypKa version: {pypka_version}\n"
+        f"pdbmender version: {pdbmender_version}\n{pege_info if Config.md_configs.pkai else ''}"
         f"Initial time: {get_curtime()}"
     )
     logging.info(info)
