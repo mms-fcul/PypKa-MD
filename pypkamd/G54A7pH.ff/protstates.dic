@@ -1,3 +1,18 @@
+[ tautomers ]
+ASP     AS1     HD21  0.408
+ASP     AS4     HD21  0.00 
+GLU     GL1     HE21  0.408
+GLU     GL4     HE21  0.00
+HIS     HI0     ND1  -0.05
+HIS     HI1     ND1  -0.54
+HIS     HI2     ND1   0.38
+LYS     LY2     HZ1   0.44
+LYS     LY3     HZ1   0.248
+TYR     TY0     HH1   0.408
+TYR     TY2     HH1   0.00
+CYS     CY3     HG1   0.00
+CYS     CY0     HG1   0.22
+[ replace ]
 ASP q CG 5  0.33000  0.33000  0.33000  0.33000  0.27000
 ASP t OD1 5  OA  O  OA  O  OM
 ASP q OD1 5  -0.28800  -0.45000  -0.28800  -0.45000  -0.63500

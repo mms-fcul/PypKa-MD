@@ -4,7 +4,7 @@ from builtins import bool
 import logging
 from pypka import __version__ as pypka_version
 from pypka.config import ParametersDict as ParametersDictPypKa
-from pypkamd.misc import remove_comments
+from pypkamd.misc import remove_comments, read_ff_dict_section
 
 
 def get_username():
@@ -48,11 +48,10 @@ class MDConfig(ParametersDict):
         self.temp = None
 
         self.tmpDIR = "./tmp"
-
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.ffID = "G54a7pHt.ff"
-        self.ffDIR = "{0}/{1}".format(self.script_dir, self.ffID)
-        self.ff_dict = "{0}/protstates.dic".format(self.ffDIR)
+
+        self.ff_options = {"CHARMM36mpH": "CHARMM36m", "G54A7pH": "G54A7"}
+        self.ffID = None
 
         self.USER = get_username()
         self.HOST = os.uname()[1]
@@ -75,10 +74,11 @@ class MDConfig(ParametersDict):
         self.GROin = None
         self.TOPin = None
         self.MDPin = fmdp
-        self.DATin = None
+        self.DATin = ""
         self.NDXin = ""
 
-        self.LOG = open("LOG_CpHMD", "a")
+        self.LOG_fname = "LOG_CpHMD"
+        self.LOG = open(self.LOG_fname, "a")
 
         self.GroDIR = None
 
@@ -96,14 +96,15 @@ class MDConfig(ParametersDict):
 
         self.pkai = False
 
-        self.titrating_group = None
+        self.titrating_group = "Protein"
 
         self.pypka_input = "pypka_input.gro"
 
         self.sites = None
+        self.ff_tautomers = {}
 
         self.pypka_ffs_dir = "default"
-        self.pypka_ffID = "default"
+        self.pypka_ffID = None
         self.pypka_nlit = "default"
         self.pypka_nonit = "default"
 
@@ -112,6 +113,7 @@ class MDConfig(ParametersDict):
             "InitTime": float,
             "temp": float,
             "EffectiveSteps": int,
+            "RelaxSteps": int,
             "InitCycle": int,
             "EndCycle": int,
             "nCycles": int,
@@ -135,6 +137,7 @@ class MDConfig(ParametersDict):
             "pypka_ffID": str,
             "pypka_nlit": int,
             "pypka_nonit": int,
+            "ffID": str,
         }
 
         # TODO implement '>=0' condition
@@ -158,9 +161,30 @@ class MDConfig(ParametersDict):
     def calcEffectiveTime(self):
         return self.EffectiveSteps * self.TimeStep
 
+    def setFF(self):
+        if self.ffID not in self.ff_options:
+            raise IOError(
+                "ffID parameter not valid. \nPlease choose one of available options: {}".format(
+                    self.ffID, " ".join(self.ff_options.keys())
+                )
+            )
+
+        self.ffDIR = "{0}/{1}.ff".format(self.script_dir, self.ffID)
+        self.ff_dict = "{0}/protstates.dic".format(self.ffDIR)
+
+        if not self.pypka_ffID:
+            self.pypka_ffID = self.ff_options[self.ffID]
+
+        for line in read_ff_dict_section(self.ff_dict, "tautomers"):
+            cols = line.split()
+            if cols[0] not in self.ff_tautomers:
+                self.ff_tautomers[cols[0]] = []
+            self.ff_tautomers[cols[0]] += [(cols[1:])]
+
     def setFileNames(self):
         self.TOP = "{}.top".format(self.sysname)
         self.NDX = "{}.ndx".format(self.sysname)
+        self.DAT = "{}.dat".format(self.sysname)
 
     def setPypKaParams(self):
         self.pypka_params = {
@@ -176,11 +200,11 @@ class MDConfig(ParametersDict):
             "sts": "sts_cphmd",
             "nlit": self.nlit,
             "nonit": self.nonit,
+            "ffID": self.pypka_ffID,
+            "save_pdb": "delphi.pdb",
         }
         if self.pypka_ffs_dir != "default":
             self.pypka_params["ffs_dir"] = self.pypka_ffs_dir
-        if self.pypka_ffID != "default":
-            self.pypka_params["ffID"] = self.pypka_ffID
         if self.pypka_nlit != "default":
             self.pypka_params["nlit"] = self.pypka_nlit
         if self.pypka_nonit != "default":
@@ -189,6 +213,13 @@ class MDConfig(ParametersDict):
         if self.pkai and self.reduced_titration:
             self.reduced_titration = False
             logging.warn("Reduced titration has been turned off")
+
+    def check_mandatory_files(self):
+        for f in (self.GROin, self.TOPin):
+            if not os.path.isfile(f):
+                raise IOError("Missing input file {}".format(f))
+        for f in (self.NDXin, self.DATin):
+            os.path.isfile(f)
 
     def read_input_mdp(self):
         def add_sites(mdp_sites):
@@ -231,7 +262,7 @@ class MDConfig(ParametersDict):
 
                     self[param] = param_value
 
-        self.check_mandatory_files()
+        self.setFF()
         self.setFileNames()
         self.EndCycle = self.calcEndCyle()
         self.EffectiveTime = self.calcEffectiveTime()
@@ -241,9 +272,4 @@ class MDConfig(ParametersDict):
             if self[i] == None:
                 raise IOError("{} has not been defined.".format(i))
 
-    def check_mandatory_files(self):
-        for f in self.GROin, self.TOPin, self.DATin:
-            if not os.path.isfile(f):
-                raise IOError("Missing input file {}".format(f))
-        if self.NDXin:
-            os.path.isfile(self.NDXin)
+        self.check_mandatory_files()

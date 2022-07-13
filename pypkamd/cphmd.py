@@ -5,7 +5,11 @@ import subprocess as sb
 import time
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
+
+import sys
+
+sys.path.insert(0, "/home/pedror/MMS@FCUL/pypka/")
 
 from pypka import Titration
 
@@ -30,15 +34,11 @@ def create_cphdm_directory() -> None:
         )
     )
     os.system("cp -f {} {}/.".format(Config.md_configs.MDPin, Config.md_configs.tmpDIR))
-    os.system("cp -f {} {}/.".format(Config.md_configs.DATin, Config.md_configs.tmpDIR))
 
     os.chdir("{}".format(Config.md_configs.tmpDIR))
 
     create_link("{}".format(Config.md_configs.ffDIR))
-    create_link("{}/residuetypes.dat".format(Config.md_configs.ffDIR))
-
-    # convert ionic strength from molar to molecule/nm^3
-    # ionicstrMolecule = ionicstr * 0.6022
+    # create_link("{}/residuetypes.dat".format(Config.md_configs.ffDIR))
 
     relax_mdp_new_params = [
         "nsteps",
@@ -92,6 +92,7 @@ freezedim = Y Y Y
     # Create a Index File
     if Config.md_configs.NDXin:
         os.system("cp ../{} {}".format(Config.md_configs.NDXin, Config.md_configs.NDX))
+        print("cp ../{} {}".format(Config.md_configs.NDXin, Config.md_configs.NDX))
     else:
         new_ndx_cmd = "{}/gmx make_ndx -f {} -o {} " "-quiet".format(
             Config.md_configs.GroDIR, Config.md_configs.GRO, Config.md_configs.NDX
@@ -104,7 +105,7 @@ freezedim = Y Y Y
             stderr=sb.STDOUT,
         )
 
-    # Create a Tpr File to be used in the centering procedure
+    # Create a .tpr File to be used in the centering procedure
     new_tpr_cmd = (
         "{}/gmx grompp -f {} -c {} -p {} -n {} -o fixgro.tpr "
         "-maxwarn 1000 -quiet".format(
@@ -117,14 +118,57 @@ freezedim = Y Y Y
     )
     sb.run(new_tpr_cmd, shell=True, stdout=Config.md_configs.LOG, stderr=sb.STDOUT)
 
+    # Create a .dat file for fixbox
+    if Config.md_configs.DATin:
+        os.system("cp ../{} {}".format(Config.md_configs.DATin, Config.md_configs.DAT))
+    else:
+        with open(Config.md_configs.NDX) as f:
+            save_trigger = False
+            first_index = None
+            last_index = None
+            for line in f:
+                if line.startswith("[ Protein ]"):
+                    save_trigger = True
+                elif line.startswith("["):
+                    save_trigger = False
+                elif save_trigger:
+                    if not first_index:
+                        first_index = line.split()[0]
+                    last_index = line.split()[-1]
 
-def center_titrable_molecule(
-    titrating_group: str, gro: str, ndx: str, outfile: str
-) -> None:
+        with open(Config.md_configs.DAT, "w") as f:
+            content = """# Molecular definitions file.
+# All lines not starting with the following characters are ignored:
+#   G : group name definition, followed by its molecule definitions.
+#       a : molecule defined by atom (ordinal) index range.
+#       n : molecule(s) defined by residue name.
+#       g : molecules(s) defined through previously defined group.
+#   A : group for assemblage stage, one line per (sequential) stage.
+#   C : groups to be centered along the three box vectors (a,b,c or v1,v2,v3).
+
+G Protein
+#1st chain goes from 1st atom to atom 5743 (ordinal, not atom numbers)
+a    {} {}
+
+# Groups to be (sequentially) assembled:
+A Protein
+
+# Groups to be centered along each of the three box vectors:
+C Protein Protein Protein W W W
+
+# Use PBC (1) or not (0) along each of the three box vectors:
+P Protein Protein Protein
+    """.format(
+                first_index, last_index
+            )
+            f.write(content)
+
+
+def center_titrable_molecule(titrating_group: str, gro: str, ndx: str) -> str:
     # Centering procedure
-    # effective.gro -> fixgro_input.gro -> pypka_input.gro
+    # effective.gro -> fixgro_input.gro -> centered.gro
 
-    # TODO change input variable fixgr
+    f_out_name = "centered.gro"
 
     fixgro_cmd = (
         "{}/gmx trjconv -f {} "
@@ -132,7 +176,7 @@ def center_titrable_molecule(
         "-pbc mol -quiet; ".format(Config.md_configs.GroDIR, gro, ndx)
     )
     fixgro_cmd += "{}/fixbox fixgro_input.gro {} " "> {}".format(
-        Config.md_configs.fixboxDIR, Config.md_configs.DATin, outfile
+        Config.md_configs.fixboxDIR, Config.md_configs.DAT, f_out_name
     )
 
     input_str = "{}\n".format(titrating_group)
@@ -144,8 +188,15 @@ def center_titrable_molecule(
         stderr=sb.STDOUT,
     )
 
-    rm_cmd = "rm fixgro_input.gro"
-    sb.run(rm_cmd, shell=True)
+    if os.path.isfile("fixgro_input.gro"):
+        rm_cmd = "rm fixgro_input.gro"
+        sb.run(rm_cmd, shell=True)
+    else:
+        raise Exception(
+            f"Centering procedure failed. Check {Config.md_configs.LOG_fname} for more info."
+        )
+
+    return f_out_name
 
 
 def run_dynamics(mdp: str, gro: str, top: str, ndx: str, sysname: str) -> None:
@@ -282,8 +333,32 @@ def final_cleanup(sysname: str, tmpDIR: str, effective_name: str) -> None:
     os.system("rm -r {}".format(tmpDIR))
 
 
+def write_pypka_inputgro(f_centered_name: str, nontitrating_res: str) -> None:
+    new_lines = []
+    with open(f_centered_name) as f:
+        line_counter = 0
+        natoms_left = 0
+        for line in f:
+            line_counter += 1
+            if natoms_left > 0:
+                natoms_left -= 1
+                resnumb = read_gro_line(line)[3]
+
+                if resnumb in nontitrating_res:
+                    resname = nontitrating_res[resnumb]
+                    line = "{}{}{}".format(line[:5], resname, line[8:])
+
+            elif line_counter == 2:
+                natoms_left = int(line.strip())
+
+            new_lines.append(line)
+
+    with open(Config.md_configs.pypka_input, "w") as f_new:
+        f_new.write("".join(new_lines))
+
+
 def run_pbmc(
-    params, sites, pH, offset, fixed_sites
+    params: Dict, sites: List, pH: float, offset: int, fixed_sites: Dict
 ) -> Tuple[Dict[int, int], Dict[int, float], Dict[int, list]]:
     prot_states = {}
     prot_avgs = {}
@@ -291,6 +366,7 @@ def run_pbmc(
     if len(sites) > 0:
         with redirect_stdout(io.StringIO()) as f:
             tit = Titration(params, sites={"A": sites}, fixed_sites={"A": fixed_sites})
+
         Config.md_configs.LOG.write(f.getvalue())
         print("\r" + " " * 90, end="\r")
 
@@ -357,21 +433,23 @@ def run_cphmd(top: str) -> None:
             logging.info(info)
 
         ### PB/MC ###
-        info = "{} | PB/MC - titrating {} sites".format(
-            get_curtime(), len(top.titrating_sites)
-        )
-        if top.fixed_sites:
-            info += " and {} fixed states".format(len(top.fixed_sites))
-        logging.info(info)
-
-        center_titrable_molecule(
+        f_centered_name = center_titrable_molecule(
             Config.md_configs.titrating_group,
             Config.md_configs.GRO,
             Config.md_configs.NDX,
-            Config.md_configs.pypka_input,
         )
 
         if not Config.md_configs.pkai:
+            info = "{} | PB/MC - titrating {} sites".format(
+                get_curtime(), len(top.titrating_sites)
+            )
+            if top.fixed_sites:
+                info += " and {} fixed states".format(len(top.fixed_sites))
+            logging.info(info)
+
+            write_pypka_inputgro(f_centered_name, top.nontit_tautomers)
+            os.system(f"cp {Config.md_configs.pypka_input} pypka_input_{cycle}.gro")
+
             pb_prot_states, pb_prot_avgs, pb_taut_probs = run_pbmc(
                 Config.md_configs.pypka_params,
                 top.titrating_sites[:],
@@ -380,8 +458,13 @@ def run_cphmd(top: str) -> None:
                 {k: v["state"] for k, v in top.fixed_sites.items()},
             )
         else:
+            info = "{} | AI/MC - titrating {} sites".format(
+                get_curtime(), len(top.titrating_sites)
+            )
+            logging.info(info)
+
             pb_prot_states, pb_prot_avgs, pb_taut_probs = run_pkai(
-                Config.md_configs.pypka_input,
+                f_centered_name,
                 top.titrating_sites[:],
                 Config.md_configs.pH,
                 top.offset,
@@ -395,6 +478,7 @@ def run_cphmd(top: str) -> None:
             get_curtime(), Config.md_configs.RelaxSteps
         )
         logging.info(info)
+        os.system(f"cp {Config.md_configs.TOP} topol_{cycle}.top")
 
         run_dynamics(
             Config.md_configs.MDP_relax,

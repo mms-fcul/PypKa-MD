@@ -1,4 +1,6 @@
 old_cph_versions/
+calibration/
+tests/
 play/
 vals/
 debug

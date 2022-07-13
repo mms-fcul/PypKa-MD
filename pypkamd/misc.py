@@ -45,3 +45,15 @@ def check_convert_termini(site: str, offset: int) -> int:
     if isinstance(site, str) and site[-1] in "NC":
         site = offset + int(site[:-1])
     return site
+
+def read_ff_dict_section(fname, section):
+    trigger_read = False
+    with open(fname) as f_dict:
+        for line in f_dict:
+            if "[" in line and "]" in line:
+                if section in line:
+                    trigger_read = True
+                else:
+                    trigger_read = False
+            elif trigger_read:
+                yield line

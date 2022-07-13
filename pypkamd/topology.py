@@ -2,7 +2,12 @@ import logging
 import random
 from typing import Optional, List, Tuple, Dict
 
-from pypkamd.misc import check_convert_termini, get_titrable_sites, remove_comments
+from pypkamd.misc import (
+    check_convert_termini,
+    get_titrable_sites,
+    remove_comments,
+    read_ff_dict_section,
+)
 from pypkamd.constants import TITRABLE_AAS
 from pypkamd.configs import Config
 
@@ -40,7 +45,7 @@ class Topology:
             configs.sites = get_titrable_sites(configs.GROin)
 
             logging.info(
-                "\n{} titrable sites have been identified".format(len(configs.sites))
+                " {} titrable sites have been identified".format(len(configs.sites))
             )
 
         self.all_sites = configs.sites[:]
@@ -48,8 +53,13 @@ class Topology:
         self.rt_cur_cycle = 0
         self.fixed_sites = {}
 
-        self.read_input_top(configs.TOPin, configs.sites, configs.ffID)
+        self.read_input_top(
+            configs.TOPin, configs.sites, configs.ffDIR.split("/")[-1], configs.ff_dict
+        )
         self.read_ff_dict(configs.ff_dict)
+
+        self.nontit_tautomers = {}
+        self.get_non_tit_tauts(configs.ff_tautomers)
 
         self.index_atoms = {configs.titrating_group: []}
 
@@ -138,7 +148,9 @@ class Topology:
             if anumb_ == anumb:
                 return atom[2]
 
-    def read_input_top(self, f_top: str, titrating_resnumbs: List[int], ffID: str):
+    def read_input_top(
+        self, f_top: str, titrating_resnumbs: List[int], ffDIR: str, ff_dict: str
+    ):
         def save_other_lines(last_section: str, line: str):
             if last_section == None:
                 last_section = "begin"
@@ -160,6 +172,20 @@ class Topology:
 
         cph_ready_resnames = {i: ii for i, ii in TITRABLE_AAS.items()}
 
+        termini_atoms = {}
+        for line in read_ff_dict_section(ff_dict, "replace"):
+            cols = line.split()
+            resname = cols[0]
+            atom_type = cols[2]
+
+            if resname[:2] not in ("NT", "CT"):
+                continue
+
+            if resname not in termini_atoms:
+                termini_atoms[resname] = []
+            if atom_type not in termini_atoms[resname]:
+                termini_atoms[resname].append(atom_type)
+
         last_section = None
         section = "begin"
         tmp_ter_atoms = {}
@@ -174,9 +200,9 @@ class Topology:
                 if "#include" in line and "./" in line:
                     ff = line.split("./")[1].split("/")[0]
                     assert (
-                        ff == ffID
+                        ff == ffDIR
                     ), "Topology file error\nLine {}\nShould be replaced by: {}".format(
-                        line, line.replace(ff, ffID)
+                        line, line.replace(ff, ffDIR)
                     )
 
                 if clean_line.startswith("[ "):
@@ -210,38 +236,23 @@ class Topology:
                         if resnumb in ter_resnumbs:
                             ter_type = ter_resnumbs[resnumb]
                             if ter_type == "N":
-                                if resname not in ("GLY", "PRO") and atype in (
-                                    "N",
-                                    "H1",
-                                    "H2",
-                                    "H3",
-                                    "CA",
+                                if (
+                                    resname not in ("GLY", "PRO")
+                                    and atype in termini_atoms["NT"]
                                 ):
                                     self.ters[resnumb] = "NT"
                                     add_ter_atom = True
                                     # self.section["atoms"][-1][3] = "NT"
 
-                                elif resname in ("GLY", "PRO") and atype in (
-                                    "N",
-                                    "H1",
-                                    "H2",
-                                    "H3",
-                                    "CA",
-                                    "CD",
-                                ):  # TODO: read from dictionary.dic
+                                elif (
+                                    resname in ("GLY", "PRO")
+                                    and atype
+                                    in termini_atoms["NTGLY"] + termini_atoms["NTPRO"]
+                                ):
                                     self.ters[resnumb] = "NT" + resname
                                     add_ter_atom = True
                             elif ter_type == "C":
-                                if atype in (
-                                    "CA",
-                                    "C",
-                                    "O1",
-                                    "O2",
-                                    "HO11",
-                                    "HO12",
-                                    "HO21",
-                                    "HO22",
-                                ):  # TODO: read from dictionary.dic
+                                if atype in termini_atoms["CT"]:
                                     self.ters[resnumb] = "CT"
                                     add_ter_atom = True
                                     # self.section["atoms"][-1][3] = "CT"
@@ -281,42 +292,61 @@ class Topology:
 
         tit_res_cph = self.get_titrable_resnames()
 
-        with open(ff_dict) as f_dict:
-            for line in f_dict:
-                cols = line.split()
-                resname = cols[0]
-                line_type = cols[1]
-                natoms = self.prop_types[line_type][0]
-                n_tauts = int(cols[2 + natoms])
-                assert n_tauts + natoms + 3 == len(
-                    cols
-                ), "There is an inconsistency in the ff_dict file"
+        for line in read_ff_dict_section(ff_dict, "replace"):
+            cols = line.split()
+            resname = cols[0]
+            line_type = cols[1]
+            natoms = self.prop_types[line_type][0]
+            n_tauts = int(cols[2 + natoms])
+            assert n_tauts + natoms + 3 == len(
+                cols
+            ), "There is an inconsistency in the ff_dict file"
 
-                if resname not in tit_res_cph:
-                    # print(resname, tit_res)
-                    continue
+            if resname not in tit_res_cph:
+                # print(resname, tit_res)
+                continue
 
-                properties = cols[-n_tauts:]
-                prop_obj = self.prop_types[line_type][1]
+            properties = cols[-n_tauts:]
+            prop_obj = self.prop_types[line_type][1]
 
-                if line_type in ("t", "q"):
-                    aname = cols[2]
-                    for atom in self.get_atoms(resname, aname):
-                        prop_obj[atom[0]] = properties
+            if line_type in ("t", "q"):
+                aname = cols[2]
+                for atom in self.get_atoms(resname, aname):
+                    prop_obj[atom[0]] = properties
 
-                elif line_type in ("b", "a", "d", "i"):
-                    anames = cols[2 : 2 + natoms]
-                    search_in = self.prop_types[line_type][2]
+            elif line_type in ("b", "a", "d", "i"):
+                anames = cols[2 : 2 + natoms]
+                search_in = self.prop_types[line_type][2]
 
-                    for i, item in self.search_by_anames(search_in, resname, anames):
-                        resnumb = self.get_resnumb_from_anumb(item[0])
-                        prop_obj[i] = (resnumb, item[:natoms], properties)
+                for i, item in self.search_by_anames(search_in, resname, anames):
+                    resnumb = self.get_resnumb_from_anumb(item[0])
+                    prop_obj[i] = (resnumb, item[:natoms], properties)
 
         # from pprint import pprint
         # pprint(self.tit_angles)
         # pprint(self.prop_types["a"])
         # pprint(self.tit_charges)
         # exit()
+
+    def get_non_tit_tauts(self, titratable_residues) -> None:
+        anames = {
+            resname: [i[1] for i in cols]
+            for resname, cols in titratable_residues.items()
+        }
+        for atom in self.section["atoms"]:
+            _, _, resnumb, resname, aname, _, charge, _ = atom
+
+            if (
+                resname in titratable_residues
+                and aname in anames[resname]
+                and int(resnumb) not in self.all_sites
+            ):
+                taut_numb = None
+                for taut in titratable_residues[resname]:
+                    taut_numb, taut_aname, taut_acharge = taut
+                    if taut_aname == aname and taut_acharge == charge:
+                        break
+                self.nontit_tautomers[int(resnumb)] = taut_numb
 
     def read_index(self, ndx: str) -> None:
         index_groups = self.index_atoms.keys()
